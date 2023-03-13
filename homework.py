@@ -32,7 +32,6 @@ logger.addHandler(handler)
 
 def check_tokens():
     """Проверка валидности токенов."""
-
     tokens = [
         PRACTICUM_TOKEN,
         TELEGRAM_CHAT_ID,
@@ -53,7 +52,6 @@ def check_tokens():
 
 def send_message(bot, message):
     """Функция отправки сообщения."""
-
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.debug(
@@ -70,7 +68,6 @@ def send_message(bot, message):
 
 def get_api_answer(current_timestamp):
     """Делает запрос к единственному API сервиса."""
-
     timestamp = current_timestamp or int(time.time())
     payload = {'from_date': timestamp}
 
@@ -93,7 +90,6 @@ def get_api_answer(current_timestamp):
 
 def check_response(response):
     """Проверка валидности response."""
-
     if isinstance(response, dict) and 'homeworks' in response:
         if isinstance(
             response['homeworks'],
@@ -114,7 +110,6 @@ def check_response(response):
 
 def parse_status(homework):
     """Проверяет статус домашней работы."""
-
     try:
         homework_name = homework['homework_name']
         homework_status = homework['status']
@@ -129,7 +124,6 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-
     if not check_tokens():
         sys.exit(
             'Обнаружена пустая переменная.'
