@@ -18,3 +18,9 @@ class UndefinedStatus(Exception):
     Исключение при не задокументированном статусе.
     """
     pass
+
+class EmtyResponseFromAPI(Exception):
+    """
+    Исключение при пустом ответе от API.
+    """
+    pass
