@@ -53,7 +53,7 @@ def check_tokens():
     tokens: list = []
     for token in TOKEN_NAMES:
         tokens.append(globals().get(token))
-    if None or '' in tokens:
+    if all(tokens) is False:
         check = False
         empty_token = [
             token_name for token_name in TOKEN_NAMES
@@ -61,8 +61,9 @@ def check_tokens():
         ]
         logger.critical(f'Пустой токен, - {empty_token}')
         return check
-    logger.debug('Токены валидны')
-    return check
+    else:
+        logger.debug('Токены валидны')
+        return check
 
 
 def send_message(bot, message):
@@ -102,7 +103,7 @@ def get_api_answer(current_timestamp):
                 f'{response.json()}, {response.reason}',
             )
         return response.json()
-    except ConnectionError:
+    except requests.RequestException:
         (
             'Ошибка доступа к API: '
             'URL - {url}, '
@@ -149,6 +150,7 @@ def main():
     """Основная логика работы бота."""
     if not check_tokens():
         raise KeyError('Обнаружена пустая переменная.')
+
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = 0
     current_report = {}
