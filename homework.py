@@ -6,15 +6,12 @@ from http import HTTPStatus
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from config import (ENDPOINT, HEADERS, HOMEWORK_VERDICTS, PRACTICUM_TOKEN,
-                    RETRY_PERIOD, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN)
-
-from exceptions import EmtyResponseFromAPI, EndpointError
-
 import requests
-
 import telegram
 
+from config import (ENDPOINT, HEADERS, HOMEWORK_VERDICTS, PRACTICUM_TOKEN,
+                    RETRY_PERIOD, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN)
+from exceptions import EmtyResponseFromAPI, EndpointError
 
 FILE_NAME = Path(__file__).stem
 
@@ -52,43 +49,44 @@ TOKEN_NAMES = (
 
 def check_tokens():
     """Проверка валидности токенов."""
-    tokens = []
+    check: bool = True
+    tokens: list = []
     for token in TOKEN_NAMES:
         tokens.append(globals().get(token))
-    if all(tokens):
-        logger.debug('Токены валидны')
-        return all(tokens)
-    else:
+    if None or '' in tokens:
+        check = False
         empty_token = [
             token_name for token_name in TOKEN_NAMES
             if not globals().get(token_name)
         ]
         logger.critical(f'Пустой токен, - {empty_token}')
-        return False
+        return check
+    logger.debug('Токены валидны')
+    return check
 
 
 def send_message(bot, message):
     """Функция отправки сообщения."""
+    logger.debug('Отправка сообщения.')
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.debug(
             f'{message} успешно отправлено.',
         )
         return True
-    except telegram.error.TelegramError as e:
+    except telegram.error.TelegramError as error:
         logger.error(
-            f'Сообщение не отпралено, ошибка: {e}',
+            f'Сообщение не отпралено, ошибка: {error}',
         )
         return False
 
 
 def get_api_answer(current_timestamp):
     """Делает запрос к единственному API сервиса."""
-    timestamp = current_timestamp
     api_answer = {
         'url': ENDPOINT,
         'headers': HEADERS,
-        'params': {'from_date': timestamp},
+        'params': {'from_date': current_timestamp},
     }
     logger.debug(
         'Запрос к API {url}, {headers} '
@@ -99,10 +97,6 @@ def get_api_answer(current_timestamp):
             **api_answer,
         )
         if response.status_code != HTTPStatus.OK:
-            logger.error(
-                f'API не доступен {response.status_code}, '
-                f'{response.json()}, {response.reason}',
-            )
             raise EndpointError(
                 f'API не доступен {response.status_code}, '
                 f'{response.json()}, {response.reason}',
@@ -115,29 +109,26 @@ def get_api_answer(current_timestamp):
             'Headers -  {headers}, '
             'params - {params}'.format(**api_answer)
         )
-    # Pytest не проходит без исключения ниже.
-    except Exception as error:
-        raise EndpointError(error)
 
 
 def check_response(responses):
     """Проверка валидности response."""
     logger.debug('Проверка формата')
+
     if not isinstance(responses, dict):
-        logger.error(
-            'Формат ответа не соответсвует ожидаемому.',
-        )
         raise TypeError('Пустой ответ от API.')
 
     if 'homeworks' not in responses:
         logger.error('Нет ключа homeworks в response')
         raise EmtyResponseFromAPI('Нет ключа homeworks в response.')
-    if not isinstance(responses['homeworks'], list):
+
+    homeworks = responses.get('homeworks')
+
+    if not isinstance(homeworks, list):
         logger.error(
             'Формат ответа не соответсвует ожидаемому.',
         )
         raise TypeError('response не список')
-    homeworks = responses.get('homeworks')
     return homeworks
 
 
@@ -162,17 +153,19 @@ def main():
     timestamp = 0
     current_report = {}
     prev_report = {}
-    print(current_report)
+
     while True:
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
+
             if homeworks:
                 homework = homeworks[0]
                 current_report['verdict'] = parse_status(homework)
                 current_report['name'] = homework['homework_name']
             else:
                 current_report['verdict'] = 'Нет новых статусов'
+
             if current_report != prev_report:
                 if send_message(bot, current_report['verdict']):
                     prev_report = current_report.copy()
@@ -183,21 +176,22 @@ def main():
                 logger.debug(
                     'Нет изменений в статусах работ',
                 )
+
         except EmtyResponseFromAPI as error:
             logger.error(f'Ошибка отравки сообщения - {error}')
             (f'Ошибка отправки сообщения - {error}')
+
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             current_report['verdict'] = message
             logger.error(message)
+
             if current_report != prev_report:
                 send_message(bot, message)
+
         finally:
             time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        logger.debug('Бот остановлен')
+    main()
