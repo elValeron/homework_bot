@@ -38,37 +38,25 @@ logger.addHandler(stream_handler)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-PRACTICUM_TOKEN = PRACTICUM_TOKEN
-
-TOKEN_NAMES = (
-    'PRACTICUM_TOKEN',
-    'TELEGRAM_TOKEN',
-    'TELEGRAM_CHAT_ID',
-)
-
 
 def check_tokens():
     """Проверка валидности токенов."""
+    tokens = (
+        (PRACTICUM_TOKEN, 'PRACTICUM_TOKEN'),
+        (TELEGRAM_TOKEN, 'TELEGRAM_TOKEN'),
+        (TELEGRAM_CHAT_ID, 'TELEGRAM_CHAT_ID'),
+    )
     check: bool = True
-    tokens: list = []
-    for token in TOKEN_NAMES:
-        tokens.append(globals().get(token))
-    if all(tokens) is False:
-        check = False
-        empty_token = [
-            token_name for token_name in TOKEN_NAMES
-            if not globals().get(token_name)
-        ]
-        logger.critical(f'Пустой токен, - {empty_token}')
-        return check
-    else:
-        logger.debug('Токены валидны')
-        return check
+    for token, name in tokens:
+        if not token:
+            logger.critical(f'Пустая переменная, - {name}')
+            check = False
+    return check
 
 
 def send_message(bot, message):
     """Функция отправки сообщения."""
-    logger.debug('Отправка сообщения.')
+    logger.debug(f'Отправка сообщения - {message}')
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.debug(
@@ -115,20 +103,13 @@ def get_api_answer(current_timestamp):
 def check_response(responses):
     """Проверка валидности response."""
     logger.debug('Проверка формата')
-
     if not isinstance(responses, dict):
         raise TypeError('Пустой ответ от API.')
-
     if 'homeworks' not in responses:
         logger.error('Нет ключа homeworks в response')
         raise EmtyResponseFromAPI('Нет ключа homeworks в response.')
-
     homeworks = responses.get('homeworks')
-
     if not isinstance(homeworks, list):
-        logger.error(
-            'Формат ответа не соответсвует ожидаемому.',
-        )
         raise TypeError('response не список')
     return homeworks
 
@@ -150,24 +131,20 @@ def main():
     """Основная логика работы бота."""
     if not check_tokens():
         raise KeyError('Обнаружена пустая переменная.')
-
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = 0
     current_report = {}
     prev_report = {}
-
     while True:
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-
             if homeworks:
                 homework = homeworks[0]
                 current_report['verdict'] = parse_status(homework)
                 current_report['name'] = homework['homework_name']
             else:
                 current_report['verdict'] = 'Нет новых статусов'
-
             if current_report != prev_report:
                 if send_message(bot, current_report['verdict']):
                     prev_report = current_report.copy()
@@ -178,19 +155,15 @@ def main():
                 logger.debug(
                     'Нет изменений в статусах работ',
                 )
-
         except EmtyResponseFromAPI as error:
             logger.error(f'Ошибка отравки сообщения - {error}')
             (f'Ошибка отправки сообщения - {error}')
-
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             current_report['verdict'] = message
             logger.error(message)
-
             if current_report != prev_report:
                 send_message(bot, message)
-
         finally:
             time.sleep(RETRY_PERIOD)
 
